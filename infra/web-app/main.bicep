@@ -1,5 +1,5 @@
 @description('The Azure location to create the resources in')
-param location string = 'westeurope'
+param location string = 'northeurope'
 
 @description('Name for the serviceplan and webapp (defines the subdomain)')
 param appName string
