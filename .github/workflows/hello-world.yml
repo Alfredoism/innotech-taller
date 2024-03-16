@@ -2,19 +2,34 @@ name: Hello World Innotech
 
 on:
   workflow_dispatch:
-  issues:
-    types: [opened, edited]
+    inputs:
+        logLevel:
+          description: 'Log level'
+          required: true
+          default: 'warning'
+          type: choice
+          options:
+            - info
+            - warning
+            - debug
+        print_tags:
+          description: 'True to print to STDOUT'
+          required: true
+          type: boolean
+        tags:
+          description: 'Test scenario tags'
+          required: true
+          type: string
+        environment:
+          description: 'Environment to run tests against'
+          type: environment
+          required: true
 
 jobs:
-  greet:
-    env:
-      MY_ENV: "John Doe"
+  print-tag:
     runs-on: ubuntu-latest
+    if:  ${{ inputs.print_tags }} 
     steps:
-      - name: Greet the User
-        run: echo "Hello World!"
-      - name: Run a multi-line script
-        run: |
-          echo "Hello $MY_ENV"
-          echo "Hello $GITHUB_ACTOR"
+      - name: Print the input tag to STDOUT
+        run: echo  The tags are ${{ inputs.tags }} 
      
