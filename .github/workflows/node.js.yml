@@ -1,48 +1,46 @@
 # This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
 
-name: Packaging
+name: Packaging CI con Deploy
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: ["main"]
   pull_request:
-    branches: [ main ]
+    branches: ["main"]
 
 jobs:
   build:
-    name: Build and Test
+    name: "Build and Test"
     runs-on: ubuntu-latest
-   
     permissions:
       contents: read
       pull-requests: write
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js 16.x
-      uses: actions/setup-node@v3
-      with:
-        node-version: 20.x
-        cache: npm
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test
-    - name: Report Coverage
-      uses: davelosert/vitest-coverage-report-action@v2
-      if: always()
+      - uses: actions/checkout@v3
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build --if-present
+      - run: npm test
+      - name: "Report Coverage"
+        if: always()
+        uses: davelosert/vitest-coverage-report-action@v2
 
   package-and-publish:
     needs:
       - build
-
     name: 🐳 Package & Publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     outputs:
-       container: ${{ steps.meta.outputs.tags }}
+      container: ${{ steps.meta.outputs.tags }}
 
     steps:
       - uses: actions/checkout@v3
@@ -57,7 +55,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           registry: ghcr.io
 
-      - name: Generate Docker Metadata
+      - name: Generate docker metadata
         id: meta
         uses: docker/metadata-action@v4
         with:
@@ -66,7 +64,6 @@ jobs:
             type=ref,event=tag
             type=ref,event=pr
             type=sha,event=branch,prefix=,suffix=,format=short
-
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v2
         with:
@@ -77,31 +74,31 @@ jobs:
           cache-to: type=gha,mode=max
 
   staging:
-          name: Deploy to Staging
-          needs: [package-and-publish]
-          runs-on: ubuntu-latest
-          ## Only deploy after merges to the main branch, not on every PR
-          if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-          permissions:
-            contents: read
-          environment:
-            name: staging
-            url: "${{ steps.deploy.outputs.url }}"
-      
-          steps:
-            - uses: actions/checkout@v2
-      
-            - name: Log in to Azure using credentials
-              uses: azure/login@v1
-              with:
-                creds: ${{ secrets.AZURE_CREDENTIALS }}
-      
-            - name: Deploy resources
-              uses: azure/arm-deploy@v1
-              id: deploy
-              with:
-                scope: subscription
-                region: westeurope
-                deploymentName: ${{ vars.AZ_APP_NAME }}-deployment
-                template: ./infra/web-app/main.bicep
-                parameters: "containerImage=${{ needs.package-and-publish.outputs.container }} actor=${{ github.actor }} appName=aw-${{ vars.AZ_APP_NAME }} repository=${{ github.repository }}"
+    name: Deploy to Staging
+    needs: [package-and-publish]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: staging
+      url: "${{ steps.deploy.outputs.url }}"
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Log in to Azure using OIDC
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy resources
+        uses: azure/arm-deploy@v1
+        id: deploy
+        with:
+          scope: subscription
+          region: westeurope
+          deploymentName: ${{ vars.AZ_APP_NAME }}-deployment
+          template: ./infra/web-app/main.bicep
+          parameters: "containerImage=${{ needs.package-and-publish.outputs.container }} actor=${{ github.actor }} appName=aw-${{ vars.AZ_APP_NAME }} repository=${{ github.repository }}"
